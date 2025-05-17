@@ -2,49 +2,68 @@ import CoreML
 import SwiftUI
 import Vision
 
+// A simple struct for detected objects.
+struct DetectedObject: Identifiable {
+	let id = UUID()
+	let label: String
+	// Normalized bounding box (x, y, width, height) with values in 0...1.
+	let boundingBox: CGRect
+}
+
 struct ContentView: View {
 	@State private var viewModel = ViewModel()
-	@State private var foundDescription: String = ""
-	// New state variable for animation
+	// When using an object detection model, store an array of detections.
+	@State private var detectedObjects: [DetectedObject] = []
+	// For the animated rainbow border (if still needed)
 	@State private var rotationAngle: Double = 0
 
 	func classify() {
-		foundDescription = ""
+		// Clear previous detections.
+		detectedObjects = []
+
+		// Your currentFrame is assumed to be a CGImage.
 		guard let cgImage = viewModel.currentFrame else {
 			print("No valid frame available for classification!")
 			return
 		}
 		print("Got image in classify")
 
+		// IMPORTANT: Use your object detection model here.
+		// For example, if you have a model that returns VNRecognizedObjectObservation:
 		guard
 			let visionModel = try? VNCoreMLModel(
-				// slower model but better results
-				for: SlowVIT(configuration: MLModelConfiguration()).model
-			)
+				for: FastVIT(configuration: MLModelConfiguration()).model)
 		else {
 			print("Failed to load FastVIT model")
 			return
 		}
 
-		// Create a request with a completion handler.
+		// Create a VNCoreMLRequest. We assume the model returns VNRecognizedObjectObservation.
 		let request = VNCoreMLRequest(model: visionModel) { request, error in
 			if let error = error {
 				print("Error during classification: \(error)")
 				return
 			}
-			// Process classification results.
-			if let results = request.results as? [VNClassificationObservation],
-				let firstObservation = results.first
-			{
+
+			// Process object detection results.
+			if let results = request.results as? [VNRecognizedObjectObservation] {
+				let objects = results.map { observation -> DetectedObject in
+					// Use the top label from each observation.
+					let label = observation.labels.first?.identifier ?? "Unknown"
+					return DetectedObject(label: label, boundingBox: observation.boundingBox)
+				}
+				// Update UI on the main thread.
 				DispatchQueue.main.async {
-					print(firstObservation)
-					foundDescription = firstObservation.identifier
+					detectedObjects = objects
 				}
 			} else {
-				foundDescription = "something went wrong 😔"
+				print("No objects detected")
 			}
 		}
+		// Optionally set crop and scale option.
+		request.imageCropAndScaleOption = .scaleFill
 
+		// Create an image request handler and perform the request.
 		let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up)
 		do {
 			try handler.perform([request])
@@ -53,29 +72,43 @@ struct ContentView: View {
 		}
 	}
 
-	func findEmoji(description: String) -> String {
-		return ""
-	}
-
-	var pillOffset: CGFloat {
-		foundDescription.isEmpty
-			? (-UIScreen.main.bounds.height / 2 + 15)
-			: (-UIScreen.main.bounds.height / 2 + 100)
-	}
-
 	var body: some View {
 		ZStack {
 			CameraView(image: $viewModel.currentFrame)
 				.ignoresSafeArea()
-			Text(foundDescription)
+
+			// Overlay the detected objects.
+			GeometryReader { geometry in
+				ForEach(detectedObjects) { object in
+					// Convert normalized bounding box to view coordinates.
+					let rect = VNImageRectForNormalizedRect(
+						object.boundingBox,
+						Int(geometry.size.width),
+						Int(geometry.size.height))
+
+					// Draw a rectangle and label.
+					ZStack(alignment: .topLeading) {
+						Rectangle()
+							.strokeBorder(Color.red, lineWidth: 2)
+							.frame(width: rect.width, height: rect.height)
+						Text(object.label)
+							.font(.caption)
+							.padding(4)
+							.background(Color.red.opacity(0.7))
+							.foregroundColor(.white)
+					}
+					.position(x: rect.midX, y: rect.midY)
+				}
+			}
+			// Optionally, if you still want the animated pill (for something else)
+			Text("")
 				.padding(.vertical, 8)
 				.padding(.horizontal, 16)
 				.background(
 					Capsule()
-						.fill(.regularMaterial)
+						.fill(.ultraThinMaterial)
 						.frame(height: 37)
 				)
-				// Overlay animated rainbow border
 				.overlay(
 					Capsule()
 						.stroke(
@@ -91,8 +124,7 @@ struct ContentView: View {
 						)
 						.blur(radius: 2.5)
 				)
-				.offset(y: pillOffset)
-				.animation(.easeInOut(duration: 0.5), value: foundDescription)
+				.offset(y: -UIScreen.main.bounds.height / 2 + 15)
 
 			VStack {
 				Spacer()
@@ -117,7 +149,7 @@ struct ContentView: View {
 			}
 		}
 		.onAppear {
-			// Starts a continuous animation of the rainbow border
+			// Starts the continuous animation for the rainbow border.
 			withAnimation(Animation.linear(duration: 4).repeatForever(autoreverses: false)) {
 				rotationAngle = 360
 			}
