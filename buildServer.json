@@ -1,0 +1,15 @@
+{
+	"name": "xcode build server",
+	"version": "0.2",
+	"bspVersion": "2.0",
+	"languages": [
+		"swift"
+	],
+	"argv": [
+		"/opt/homebrew/bin/xcode-build-server"
+	],
+	"workspace": "/Users/enzoenrico/code/academy/dynamic_island_emoji/dynamic_island_emoji.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/enzoenrico/Library/Developer/Xcode/DerivedData/dynamic_island_emoji-dojxmtlonicnchaiboyngqnfwlwv",
+	"scheme": "dynamic_island_emoji",
+	"kind": "xcode"
+}

@@ -1,0 +1,21 @@
+{
+  "Inputs" : {
+    "image" : {
+      "MLFeatureShortDescription" : "Input image to be classified."
+    }
+  },
+  "Outputs" : {
+    "classLabel_probs" : {
+      "MLFeatureShortDescription" : "--"
+    },
+    "classLabel" : {
+      "MLFeatureShortDescription" : "--"
+    }
+  },
+  "TrainingInputs" : {
+
+  },
+  "States" : {
+
+  }
+}
